@@ -110,7 +110,7 @@ def load_surface_dataset(data_path: str) -> xr.Dataset:
         raise FileNotFoundError(f"No ERA5 NetCDF files found at: {data_path}")
 
     log.info(f"Loading {len(nc_files)} file(s) from {data_path}...")
-    ds = xr.open_mfdataset(nc_files, combine="by_coords", engine="scipy")
+    ds = xr.open_mfdataset(nc_files, combine="by_coords", engine="netcdf4")
     log.info(f"Dataset loaded. Variables: {list(ds.data_vars)} | Shape: {dict(ds.sizes)}")
     return ds
 
@@ -206,7 +206,7 @@ def train_random_forest(X: pd.DataFrame, y: pd.Series) -> tuple:
     log.info("Computing permutation importance (this may take ~30s)...")
     perm_result = permutation_importance(
         rf, X_test_scaled, y_test,
-        n_repeats=10, random_state=42, n_jobs=-1
+        n_repeats=10, random_state=42, n_jobs=1  # n_jobs=1 avoids circular import with local compression/ package
     )
     perm_importance = pd.DataFrame({
         "feature":            X.columns,
