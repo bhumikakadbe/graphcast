@@ -24,7 +24,14 @@ env/
 
 # Data directories with large files
 data/ERA5/raw/
+data/IMD/raw/
 dask-temp/
+
+# Processed data — large binary files (e.g. pca_compressor_2015.pkl is ~100 MB)
+data/ERA5/processed/**/*.pkl
+data/ERA5/processed/**/*.nc
+# Keep small per-variable PCA model files (each < 1 MB)
+!compression/pca_models/*.pkl
 
 # Model checkpoints (large binary files)
 checkpoints/*.nc
