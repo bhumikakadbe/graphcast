@@ -27,6 +27,7 @@ from pathlib import Path
 
 import xarray as xr
 import pandas as pd
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 Path("logs").mkdir(exist_ok=True)

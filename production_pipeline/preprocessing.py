@@ -86,31 +86,31 @@ def standardize_variables(
         logger.info(f"Renaming variables: {rename_dict}")
         ds = ds.rename(rename_dict)
 
-    # 3. Add static variables if missing
+    # 3. Add static variables only if genuinely missing (avoids grid-mismatch MergeError)
     import os
-    if "geopotential_at_surface" not in ds.data_vars or "land_sea_mask" not in ds.data_vars:
-        if os.path.exists(static_template_path):
-            logger.info(f"Loading static variables from template: {static_template_path}")
-            template_ds = xr.open_dataset(static_template_path, engine="scipy")
-            template_ds = align_coordinates(template_ds)
-            
-            # Interpolate static fields to match the exact lat/lon of ds
-            static_subset = template_ds[["geopotential_at_surface", "land_sea_mask"]]
+    static_vars_needed = [v for v in ["geopotential_at_surface", "land_sea_mask"]
+                          if v not in ds.data_vars]
+    if static_vars_needed and os.path.exists(static_template_path):
+        logger.info(f"Loading static variables from template: {static_template_path}")
+        logger.info(f"Static vars to add: {static_vars_needed}")
+        template_ds = xr.open_dataset(static_template_path, engine="scipy")
+        template_ds = align_coordinates(template_ds)
+        available = [v for v in static_vars_needed if v in template_ds.data_vars]
+        if available:
+            static_subset = template_ds[available]
             static_subset = static_subset.interp(lat=ds.lat, lon=ds.lon, method="linear")
-            
-            # Drop time dimension from static if present in template
             for var in static_subset.data_vars:
                 if "time" in static_subset[var].dims:
                     static_subset[var] = static_subset[var].isel(time=0, drop=True)
                 if "batch" in static_subset[var].dims:
                     static_subset[var] = static_subset[var].isel(batch=0, drop=True)
-            
-            # Merge into ds
             ds = xr.merge([ds, static_subset])
-            logger.info("Static variables merged successfully.")
-            template_ds.close()
-        else:
-            logger.warning(f"Static template not found at '{static_template_path}'. Static variables remain missing.")
+            logger.info(f"Static variables merged: {available}")
+        template_ds.close()
+    elif not static_vars_needed:
+        logger.info("All static variables already present in dataset -- skipping template merge.")
+    else:
+        logger.warning(f"Static template not found at '{static_template_path}'. Static variables remain missing.")
             
     return ds
 

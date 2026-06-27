@@ -115,10 +115,19 @@ class ERA5PCACompressor:
         for var in ds.data_vars:
             log.info(f"  Compressing variable: '{var}'")
             da = ds[var]
-            if "time" not in da.dims:
+            # Accept 'valid_time' (ERA5 CDS download) as well as 'time'
+            time_dim = None
+            for candidate in ("time", "valid_time"):
+                if candidate in da.dims:
+                    time_dim = candidate
+                    break
+            if time_dim is None:
                 log.debug(f"  '{var}' has no time dim — copying as-is.")
                 compressed_arrays[var] = da
                 continue
+            # Rename valid_time → time so the rest of the code is uniform
+            if time_dim == "valid_time":
+                da = da.rename({"valid_time": "time"})
 
             matrix, spatial_shape = self._get_spatial_matrix(da)
             n_time, n_spatial = matrix.shape
@@ -161,11 +170,13 @@ class ERA5PCACompressor:
             }
 
             # Wrap as DataArray with component dimension
+            # Use whichever time coord is present in the original dataset
+            time_coord_name = "time" if "time" in ds.coords else "valid_time"
             comp_da = xr.DataArray(
                 compressed,
                 dims=["time", "pca_component"],
                 coords={
-                    "time": ds["time"],
+                    "time": ds[time_coord_name].values,
                     "pca_component": np.arange(n_keep),
                 },
                 name=var,
@@ -197,12 +208,17 @@ class ERA5PCACompressor:
         compressed_ds = xr.Dataset(compressed_arrays)
         report_df = pd.DataFrame(report_rows)
 
-        total_orig = report_df["original_size_mb"].sum()
-        total_comp = report_df["compressed_size_mb"].sum()
-        log.info(f"\nPCA Compression Summary for {year}:")
-        log.info(f"  Total original size:    {total_orig:.1f} MB")
-        log.info(f"  Total compressed size:  {total_comp:.1f} MB")
-        log.info(f"  Overall compression:    {total_orig/total_comp:.1f}x")
+        if not report_df.empty and "original_size_mb" in report_df.columns:
+            total_orig = report_df["original_size_mb"].sum()
+            total_comp = report_df["compressed_size_mb"].sum()
+            log.info(f"\nPCA Compression Summary for {year}:")
+            log.info(f"  Total original size:    {total_orig:.1f} MB")
+            log.info(f"  Total compressed size:  {total_comp:.1f} MB")
+            ratio = total_orig / total_comp if total_comp > 0 else float('inf')
+            log.info(f"  Overall compression:    {ratio:.1f}x")
+        else:
+            log.warning("PCA report is empty — all variables were copied as-is (no time dimension found). "
+                        "Check that the ERA5 dataset uses 'time' or 'valid_time' as a coordinate.")
 
         return compressed_ds, report_df
 

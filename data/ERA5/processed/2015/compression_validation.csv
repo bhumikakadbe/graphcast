@@ -1,0 +1,16 @@
+variable,status,original_mean,compressed_mean,mean_rel_error_pct,std_rel_error_pct,min_rel_error_pct,max_rel_error_pct,pearson_r,pass_mean,pass_std,pass_min,pass_max,pass_corr
+temperature,PASS,252.119202,252.119202,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+specific_humidity,PASS,0.003111,0.003111,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+u_component_of_wind,PASS,9.387142,9.387142,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+v_component_of_wind,PASS,0.705915,0.705915,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+geopotential,PASS,81128.401206,81128.401206,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+vertical_velocity,PASS,-0.001241,-0.001241,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+total_precipitation_6hr,PASS,8.5e-05,8.5e-05,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+2m_temperature,PASS,300.519011,300.519011,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+10m_u_component_of_wind,PASS,0.53151,0.53151,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+10m_v_component_of_wind,PASS,0.161154,0.161154,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+mean_sea_level_pressure,PASS,100984.491214,100984.491214,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+total_cloud_cover,PASS,0.334352,0.334352,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+surface_pressure,PASS,96491.066232,96491.066232,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+land_sea_mask,PASS,0.952746,0.952746,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
+geopotential_at_surface,PASS,3826.571335,3826.571335,0.0,0.0,0.0,0.0,1.0,True,True,True,True,True
