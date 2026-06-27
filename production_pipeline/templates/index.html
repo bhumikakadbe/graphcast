@@ -1,0 +1,2062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphCast Predictor - Global Weather Prediction Console</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet.js for Interactive Map Selection -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Three.js for 3D Globe Visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #040814;
+            --panel-bg: rgba(10, 16, 32, 0.75);
+            --card-bg: rgba(16, 24, 48, 0.45);
+            --border-color: rgba(99, 102, 241, 0.15);
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.35);
+            --accent: #ec4899;
+            --success: #10b981;
+            --text-main: #f8fafc;
+            --text-muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Fullscreen Starry Background Canvas */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* ─── LANDING PAGE OVERLAY ─── */
+        #landing-page {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            transition: opacity 0.8s ease, visibility 0.8s;
+            overflow-y: auto;
+        }
+
+        .landing-container {
+            max-width: 1100px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .landing-header {
+            margin-bottom: 50px;
+        }
+
+        .landing-subtitle {
+            font-size: 13px;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .landing-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 54px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #f8fafc 30%, #93c5fd 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            margin-bottom: 20px;
+        }
+
+        .landing-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 50px;
+            text-align: left;
+        }
+
+        .landing-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .landing-card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+            padding-bottom: 12px;
+        }
+
+        .landing-card p {
+            font-size: 14px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        .btn-launch {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 99px;
+            padding: 18px 45px;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            box-shadow: 0 0 25px var(--primary-glow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            outline: none;
+        }
+
+        .btn-launch:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 35px rgba(59, 130, 246, 0.6);
+        }
+
+        /* ─── MAIN DASHBOARD ─── */
+        #dashboard-view {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+        }
+
+        header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(4, 8, 20, 0.8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 99;
+        }
+
+        .logo-section h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 22px;
+            background: linear-gradient(to right, #ffffff, #93c5fd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-section p {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            margin-top: 1px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            background: rgba(16, 185, 129, 0.08);
+            color: var(--success);
+            padding: 5px 12px;
+            border-radius: 99px;
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            background-color: var(--success);
+            border-radius: 50%;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { transform: scale(0.95); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 1; }
+        }
+
+        .main-container {
+            max-width: 1600px;
+            margin: 30px auto;
+            padding: 0 40px;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        select, input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text-main);
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+        }
+
+        .coordinates-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 8px 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .radio-label.active {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: var(--primary);
+            color: var(--text-main);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-trigger {
+            width: 100%;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: var(--text-main);
+            border: none;
+            border-radius: 10px;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-trigger:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        /* ─── VISUALIZATION VIEWPORT ─── */
+        .output-viewport {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+        }
+
+        .view-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .view-title h2 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .view-title p {
+            color: var(--text-muted);
+            font-size: 12.5px;
+            margin-top: 2px;
+        }
+
+        .results-container {
+            position: relative;
+            min-height: 550px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Dynamic Notification / Banner */
+        #status-banner {
+            display: none;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #93c5fd;
+            margin-bottom: 20px;
+            animation: pulse-banner 2s infinite;
+        }
+
+        @keyframes pulse-banner {
+            0% { opacity: 0.9; }
+            50% { opacity: 0.7; }
+            100% { opacity: 0.9; }
+        }
+
+        /* Globe Canvas Container */
+        #globe-viewport {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            min-height: 480px;
+            overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+        }
+
+        #globe-canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: grab;
+        }
+
+        #globe-canvas-container:active {
+            cursor: grabbing;
+        }
+
+        .globe-overlay-content {
+            position: absolute;
+            z-index: 5;
+            text-align: center;
+            pointer-events: none;
+            bottom: 40px;
+            width: 100%;
+            padding: 0 40px;
+        }
+
+        .globe-overlay-content h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .globe-overlay-content p {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            max-width: 550px;
+            margin: 0 auto 20px auto;
+            line-height: 1.5;
+        }
+
+        .pills-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .pill {
+            background: rgba(99, 102, 241, 0.08);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            color: #93c5fd;
+            border-radius: 99px;
+            padding: 5px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* GNN message-passing lines container */
+        #gnn-label {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Floating star helper */
+        #map-selector-card {
+            margin-bottom: 20px;
+        }
+
+        #map-leaflet {
+            height: 180px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+            z-index: 1;
+        }
+
+        /* LOADING STEPPER OVERLAY */
+        #stepper-overlay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(6, 10, 24, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .stepper-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 8px;
+            margin-bottom: 4px;
+        }
+
+        .stepper-header h4 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13.5px;
+            font-weight: 600;
+        }
+
+        .spinner-mini {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active {
+            opacity: 1;
+        }
+
+        .step-item.active .step-icon {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 6px var(--primary);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        .step-item.completed {
+            opacity: 0.8;
+        }
+
+        .step-item.completed .step-icon {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .step-item.completed .step-icon::after {
+            content: '✓';
+            color: #fff;
+            font-size: 8px;
+            font-weight: bold;
+            display: block;
+            text-align: center;
+            line-height: 10px;
+        }
+
+        .step-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .step-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .step-title {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .step-desc {
+            font-size: 9.5px;
+            color: var(--text-muted);
+        }
+
+        /* ─── SUCCESS STATE CONTAINER ─── */
+        #success-viewport-container {
+            display: none;
+            grid-template-columns: 1fr 420px;
+            gap: 25px;
+            margin-top: 5px;
+        }
+
+        .forecast-display-card {
+            display: flex;
+            flex-direction: column;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(15px);
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .forecast-display-card img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .timeline-card {
+            background: rgba(10, 16, 32, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timeline-title {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .timeline-step-text {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        .timeline-labels {
+            display: grid;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .timeline-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            padding: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .timeline-box.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: var(--primary);
+            color: var(--text-main);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+        }
+
+        #timeline-slider {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 15px;
+        }
+
+        .stat-box-title {
+            font-size: 9.5px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .stat-unit {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-left: 2px;
+        }
+
+        .analysis-card {
+            background: rgba(16, 24, 48, 0.35);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .analysis-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 6px;
+            margin-bottom: 4px;
+        }
+
+        .analysis-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11.5px;
+        }
+
+        .analysis-table td {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.02);
+        }
+
+        .analysis-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .analysis-table td.lbl {
+            color: var(--text-muted);
+        }
+
+        .analysis-table td.val {
+            text-align: right;
+            font-weight: 700;
+        }
+
+        .btn-download {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.25);
+            transition: all 0.2s ease;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-download:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Starry background -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- ─── 1. LANDING PAGE OVERLAY ─── -->
+    <div id="landing-page">
+        <div class="landing-container">
+            <div class="landing-header">
+                <p class="landing-subtitle">Next-Generation Global AI Weather Modeling</p>
+                <h1 class="landing-title">GraphCast Predictor</h1>
+            </div>
+            
+            <div class="landing-columns">
+                <div class="landing-card">
+                    <h3 class="landing-card-title">The Problem</h3>
+                    <p>Traditional Numerical Weather Prediction (NWP) models rely on extremely complex, computationally heavy physics equations. Forecasting extreme weather globally can take hours on massive supercomputer clusters, leading to critical delays in warning systems during rapidly evolving phenomena like cyclones and extreme precipitation events.</p>
+                </div>
+                <div class="landing-card">
+                    <h3 class="landing-card-title">The Solution</h3>
+                    <p>We leverage GraphCast, a state-of-the-art AI built by Google DeepMind. By utilizing Graph Neural Networks (GNNs) on an icosahedral mesh of the Earth, the model bypasses classical physics calculations and natively infers atmospheric states directly from historical ERA5 climate data.</p>
+                    <p>The result? Highly accurate, 10-day global forecasts generated in a tiny fraction of the time, allowing for unprecedented insight into incoming severe weather anywhere on the globe.</p>
+                </div>
+            </div>
+            
+            <button class="btn-launch" id="btn-launch-predictor">Launch Predictor</button>
+        </div>
+    </div>
+
+    <!-- ─── 2. MAIN OPERATIONAL DASHBOARD ─── -->
+    <div id="dashboard-view">
+        <header>
+            <div class="logo-section">
+                <h1>GraphCast Weather Terminal</h1>
+                <p>operational forecast console</p>
+            </div>
+            <div class="system-status">
+                <div class="status-dot"></div>
+                <span>Pipeline: Online (JAX CPU backend)</span>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Left panel inputs -->
+            <div class="control-panel">
+                <div class="card" id="map-selector-card">
+                    <div class="card-title">📍 Geographic Focus</div>
+                    <div id="map-leaflet"></div>
+                    <div class="coordinates-grid" style="margin-top: 15px;">
+                        <div class="input-group">
+                            <label for="lat">Latitude (°N)</label>
+                            <input type="number" id="lat" value="21.1458" step="0.01" min="-90" max="90">
+                        </div>
+                        <div class="input-group">
+                            <label for="lon">Longitude (°E)</label>
+                            <input type="number" id="lon" value="79.0882" step="0.01" min="-180" max="180">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">⚙️ Forecast Settings</div>
+
+                    <!-- Model Checkpoint -->
+                    <div class="input-group">
+                        <label for="checkpoint">Model Checkpoint</label>
+                        <select id="checkpoint">
+                            <optgroup label="Local (Downloaded)">
+                                <option value="GraphCast_small" data-res="1.0" data-levels="13" selected>
+                                    GraphCast_small — ERA5 1979-2015 (1.0°, 13 lvl)
+                                </option>
+                                <option value="fine_tuned_model" data-res="1.0" data-levels="13">
+                                    Fine-Tuned Model — Local custom checkpoint
+                                </option>
+                            </optgroup>
+                            <optgroup label="Google DeepMind (GCS)">
+                                <option value="GraphCast" data-res="0.25" data-levels="37">
+                                    GraphCast — ERA5 1979-2017 (0.25°, 37 lvl)
+                                </option>
+                                <option value="GraphCast_operational" data-res="0.25" data-levels="13">
+                                    GraphCast_operational — HRES 2016-2022 (0.25°, 13 lvl)
+                                </option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Grid Resolution (auto-synced) -->
+                    <div class="input-group">
+                        <label for="resolution">Grid Resolution</label>
+                        <select id="resolution">
+                            <option value="1.0°" selected>1.0° (~111 km) — GraphCast_small</option>
+                            <option value="0.25°">0.25° (~28 km) — GraphCast full</option>
+                        </select>
+                    </div>
+
+                    <!-- Pressure Levels (auto-synced) -->
+                    <div class="input-group">
+                        <label for="levels">Pressure Levels</label>
+                        <select id="levels">
+                            <option value="13 levels" selected>13 levels — WeatherBench (50…1000 hPa)</option>
+                            <option value="25 levels">25 levels — HRES (1…1000 hPa)</option>
+                            <option value="37 levels">37 levels — ERA5 Full (1…1000 hPa)</option>
+                        </select>
+                    </div>
+
+                    <!-- Variable — ALL 11 graphcast.py target vars -->
+                    <div class="input-group">
+                        <label for="variable">Target Forecast Variable</label>
+                        <select id="variable">
+                            <optgroup label="🌡️ Surface Variables">
+                                <option value="2m_temperature" selected>2m Temperature (T2M)</option>
+                                <option value="mean_sea_level_pressure">Mean Sea Level Pressure (MSLP)</option>
+                                <option value="10m_u_component_of_wind">10m U-Wind (U10)</option>
+                                <option value="10m_v_component_of_wind">10m V-Wind (V10)</option>
+                                <option value="total_precipitation_6hr">6-hr Total Precipitation (TP)</option>
+                            </optgroup>
+                            <optgroup label="🌀 Atmospheric Variables (pressure-level)">
+                                <option value="temperature">Temperature (T)</option>
+                                <option value="geopotential">Geopotential (Z)</option>
+                                <option value="u_component_of_wind">U-Component of Wind (U)</option>
+                                <option value="v_component_of_wind">V-Component of Wind (V)</option>
+                                <option value="vertical_velocity">Vertical Velocity (W)</option>
+                                <option value="specific_humidity">Specific Humidity (Q)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Pressure Level selector (only shown for atmospheric vars) -->
+                    <div class="input-group" id="atm-level-group" style="display:none;">
+                        <label for="atm-level">Pressure Level (hPa)</label>
+                        <select id="atm-level">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="date">Forecast Start Date</label>
+                        <input type="date" id="date" value="2026-01-02">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="projection">Map Projection</label>
+                        <select id="projection">
+                            <option value="Orthographic">3D Globe (Orthographic)</option>
+                            <option value="PlateCarree" selected>2D Flat (PlateCarree)</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <label for="steps">Forecast Steps</label>
+                            <span id="steps-label" style="color: var(--primary); font-weight: 700; font-size: 11.5px;">4 Steps (24H)</span>
+                        </div>
+                        <input type="range" id="steps" min="1" max="10" value="4" step="1">
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); padding: 2px 2px 0 2px;">
+                            <span>6h</span>
+                            <span>24h</span>
+                            <span>48h</span>
+                            <span>60h</span>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label>Region</label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 5px;">
+                            <label class="radio-label active" id="region-nagpur-btn">
+                                <input type="radio" name="region" value="Nagpur" checked style="display: none;">Nagpur, India
+                            </label>
+                            <label class="radio-label" id="region-custom-btn">
+                                <input type="radio" name="region" value="Custom" style="display: none;">Custom Bounds
+                            </label>
+                            <label class="radio-label" id="region-globe-btn">
+                                <input type="radio" name="region" value="Globe" style="display: none;">Whole Globe
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="btn-trigger" id="run-btn" style="margin-top: 15px;">
+                        <span>🚀 Run GraphCast</span>
+                    </button>
+                </div>
+
+                <!-- ─── DATA INSPECTOR CARD ─── -->
+                <div class="card" style="margin-top: 14px;">
+                    <div class="card-title">🔬 ERA5 Data Inspector</div>
+                    <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 10px 0; line-height: 1.5;">View the downloaded ERA5 batch before &amp; after GraphCast normalisation. Mirrors the <em>plot_example_data</em> cell from graphcast_demo.ipynb.</p>
+
+                    <div class="input-group">
+                        <label for="insp-variable">Variable</label>
+                        <select id="insp-variable">
+                            <optgroup label="Surface">
+                                <option value="2m_temperature" selected>2m Temperature</option>
+                                <option value="mean_sea_level_pressure">Mean Sea Level Pressure</option>
+                                <option value="10m_u_component_of_wind">10m U-Wind</option>
+                                <option value="10m_v_component_of_wind">10m V-Wind</option>
+                                <option value="total_precipitation_6hr">6-hr Precipitation</option>
+                            </optgroup>
+                            <optgroup label="Atmospheric">
+                                <option value="temperature">Temperature (atm)</option>
+                                <option value="geopotential">Geopotential</option>
+                                <option value="u_component_of_wind">U-Wind (atm)</option>
+                                <option value="v_component_of_wind">V-Wind (atm)</option>
+                                <option value="vertical_velocity">Vertical Velocity</option>
+                                <option value="specific_humidity">Specific Humidity</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <div class="input-group" id="insp-level-group" style="display:none;">
+                        <label for="insp-level">Pressure Level (hPa)</label>
+                        <select id="insp-level">
+                            <option value="50">50 hPa</option>
+                            <option value="100">100 hPa</option>
+                            <option value="150">150 hPa</option>
+                            <option value="200">200 hPa</option>
+                            <option value="250">250 hPa</option>
+                            <option value="300">300 hPa</option>
+                            <option value="400">400 hPa</option>
+                            <option value="500" selected>500 hPa</option>
+                            <option value="600">600 hPa</option>
+                            <option value="700">700 hPa</option>
+                            <option value="850">850 hPa</option>
+                            <option value="925">925 hPa</option>
+                            <option value="1000">1000 hPa</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="insp-time">Time Step Index</label>
+                        <select id="insp-time">
+                            <option value="0" selected>T=0 (1st input)</option>
+                            <option value="1">T=1 (2nd input)</option>
+                            <option value="2">T=2 (1st target)</option>
+                            <option value="3">T=3 (2nd target)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-trigger" id="inspect-btn" style="margin-top: 10px; background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); box-shadow: 0 4px 15px rgba(124,58,237,0.3);">
+                        <span>🔬 Inspect ERA5 Data</span>
+                    </button>
+
+                    <div id="inspector-result" style="margin-top: 12px; display: none;">
+                        <div style="font-size: 10.5px; color: var(--text-muted); margin-bottom: 6px;" id="inspector-caption"></div>
+                        <img id="inspector-img" src="" alt="Normalization comparison" style="width: 100%; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px; text-align: center;">← Raw ERA5  |  Normalised (z-score)  |  Δ Difference →</div>
+                    </div>
+                    <div id="inspector-loading" style="display:none; text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">
+                        <div class="spinner-mini" style="margin: 0 auto 8px auto;"></div>
+                        Generating comparison plot...
+                    </div>
+                    <div id="inspector-error" style="display:none; color: #f87171; font-size: 11px; margin-top: 8px; padding: 8px; background: rgba(248,113,113,0.08); border-radius: 6px;"></div>
+                </div>
+            </div>
+
+            <!-- Right viewport -->
+            <div class="output-viewport">
+                <div class="view-header">
+                    <div class="view-title">
+                        <h2>GraphCast | Global Predictions</h2>
+                        <p>Real-time deep learning weather forecasts over planetary grids</p>
+                    </div>
+                </div>
+
+                <div class="results-container">
+                    <!-- Status Banner for loading alerts -->
+                    <div id="status-banner">Downloading ERA5 data from CDS: this may take 5-20 min...</div>
+
+                    <!-- 3D Globe Visualizer Viewport (Active when Idle or Loading) -->
+                    <div id="globe-viewport">
+                        <div id="gnn-label">
+                            <span class="status-dot" style="background-color: var(--primary); box-shadow: 0 0 6px var(--primary);"></span>
+                            <span>GNN Icosahedral Mesh (Detail Level 3)</span>
+                        </div>
+
+                        <!-- Three.js Canvas Container -->
+                        <div id="globe-canvas-container"></div>
+
+                        <!-- Stepper overlay inside the globe -->
+                        <div id="stepper-overlay">
+                            <div class="stepper-header">
+                                <div class="spinner-mini"></div>
+                                <h4>Pipeline Execution Traces</h4>
+                            </div>
+                            <div class="step-item" id="step-1">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 1: GCS Ingestion</div>
+                                    <div class="step-desc">Streaming ERA5 NetCDF variables...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-2">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 2: Grid Alignment</div>
+                                    <div class="step-desc">Sorting lat [N-S] & level grids...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-3">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 3: Forcings Calculation</div>
+                                    <div class="step-desc">Computing solar TISR progress...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-4">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 4: Z-Score Scaling</div>
+                                    <div class="step-desc">Applying statistical normalization...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-5">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 5: JAX GNN Compile</div>
+                                    <div class="step-desc">Compiling Haiku JIT forward pass...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-6">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 6: Autoregressive Rollout</div>
+                                    <div class="step-desc">Recursive one-step predictions loop...</div>
+                                </div>
+                            </div>
+                            <div class="step-item" id="step-7">
+                                <div class="step-icon"></div>
+                                <div class="step-details">
+                                    <div class="step-title">Stage 7: Cartography Render</div>
+                                    <div class="step-desc">Plotting contour overlays & NetCDF...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Initial Idle Overlay -->
+                        <div class="globe-overlay-content" id="idle-text-overlay">
+                            <h3>Ready to Forecast</h3>
+                            <p>Configure your parameters on the left and press Run GraphCast. Each step represents a 6-hour planetary prediction.</p>
+                            <div class="pills-container">
+                                <span class="pill">ERA5 Reanalysis</span>
+                                <span class="pill">JAX + Haiku</span>
+                                <span class="pill">Autoregressive Rollout</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUCCESS STATE VIEWPORT (Fades in when complete) -->
+                    <div id="success-viewport-container">
+                        <!-- Left Success: Matplotlib Map View -->
+                        <div class="forecast-display-card">
+                            <img id="forecast-map" src="" alt="Forecast contour plot">
+                            
+                            <!-- Playback Control Panel -->
+                            <div class="playback-panel" style="width: 100%; margin-top: 15px; padding: 12px; background: rgba(16, 24, 48, 0.6); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
+                                    <span>Playback Control</span>
+                                    <span id="playback-status-text" style="color: var(--text-muted);">Stopped</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                    <div style="display: flex; gap: 6px;">
+                                        <button id="btn-first" class="radio-label" style="padding: 6px 12px; font-size: 12px;" title="First Step">⏮</button>
+                                        <button id="btn-prev" class="radio-label" style="padding: 6px 12px; font-size: 12px;" title="Step Back">◀</button>
+                                        <button id="btn-play-pause" class="radio-label" style="padding: 6px 16px; font-size: 12px; background: rgba(59, 130, 246, 0.15); border-color: var(--primary); color: #fff;" title="Play/Pause">▶ Play</button>
+                                        <button id="btn-next" class="radio-label" style="padding: 6px 12px; font-size: 12px;" title="Step Forward">▶</button>
+                                        <button id="btn-last" class="radio-label" style="padding: 6px 12px; font-size: 12px;" title="Last Step">⏭</button>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px; font-size: 11px;">
+                                        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                            <input type="checkbox" id="chk-loop" checked style="accent-color: var(--primary);"> Loop
+                                        </label>
+                                        <select id="sel-speed" style="width: 75px; padding: 4px; font-size: 11px; background: #0b1129; border: 1px solid rgba(255,255,255,0.08); color: var(--text-main); border-radius: 4px; outline: none;">
+                                            <option value="1500">Slow</option>
+                                            <option value="800" selected>Normal</option>
+                                            <option value="350">Fast</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Success: Stats, Insights, and Timeline slider -->
+                        <div style="display: flex; flex-direction: column;">
+                            <div class="timeline-card">
+                                <div class="timeline-header">
+                                    <div class="timeline-title">Forecast Timeline</div>
+                                    <div class="timeline-step-text" id="timeline-step-indicator">Step 1 — +6h</div>
+                                </div>
+                                <div class="timeline-labels" id="timeline-labels-container">
+                                    <!-- Dynamic labels grid -->
+                                </div>
+                                <input type="range" id="timeline-slider" min="0" max="3" value="0">
+                            </div>
+
+                            <div class="stats-grid">
+                                <div class="stat-box">
+                                    <div class="stat-box-title" id="stat-peak-title">Peak T2M</div>
+                                    <div class="stat-value" id="stat-peak">0.00<span class="stat-unit">°C</span></div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-title">Mean (Region)</div>
+                                    <div class="stat-value" id="stat-mean">0.00<span class="stat-unit">°C</span></div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-title">Forecast Steps</div>
+                                    <div class="stat-value" id="stat-steps">4<span class="stat-unit">× 6h</span></div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-box-title">Grid Cells</div>
+                                    <div class="stat-value" id="stat-points">9<span class="stat-unit">cells</span></div>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="analysis-title">💡 Forecast Insights & Analysis</div>
+                                <table class="analysis-table">
+                                    <tbody>
+                                        <tr>
+                                            <td class="lbl">Forecast Base Date</td>
+                                            <td class="val" id="insight-base-date">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl">Region Bounds</td>
+                                            <td class="val" id="insight-region">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl">Timeline Projected</td>
+                                            <td class="val" id="insight-projected">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl" id="insight-max-title">Maximum Event</td>
+                                            <td class="val" style="color: var(--accent);" id="insight-max-val">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl">Peak Grid Coord</td>
+                                            <td class="val" id="insight-peak-coord">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl">Est. Peak Timing</td>
+                                            <td class="val" id="insight-peak-timing">-</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="lbl" id="insight-avg-title">Average Region Val</td>
+                                            <td class="val" id="insight-avg-val">-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <a class="btn-download" id="download-link" href="#" download>
+                                <span>📥 Download NetCDF</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── 3. SCRIPTS & LOGIC ─── -->
+    <script>
+        // Fullscreen Floating Stars Canvas logic
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        let stars = [];
+
+        function resizeBgCanvas() {
+            bgCanvas.width = window.innerWidth;
+            bgCanvas.height = window.innerHeight;
+            initStars();
+        }
+
+        function initStars() {
+            stars = [];
+            const starCount = Math.floor((bgCanvas.width * bgCanvas.height) / 10000);
+            for (let i = 0; i < starCount; i++) {
+                stars.push({
+                    x: Math.random() * bgCanvas.width,
+                    y: Math.random() * bgCanvas.height,
+                    size: Math.random() * 1.5,
+                    opacity: Math.random(),
+                    speed: 0.05 + Math.random() * 0.1
+                });
+            }
+        }
+
+        function animateBgStars() {
+            bgCtx.fillStyle = '#040814';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            bgCtx.fillStyle = '#ffffff';
+            stars.forEach(star => {
+                bgCtx.globalAlpha = star.opacity;
+                bgCtx.beginPath();
+                bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                bgCtx.fill();
+                
+                // Floating movement
+                star.y -= star.speed;
+                if (star.y < 0) {
+                    star.y = bgCanvas.height;
+                    star.x = Math.random() * bgCanvas.width;
+                }
+                
+                // Twinkle
+                star.opacity += (Math.random() - 0.5) * 0.05;
+                if (star.opacity < 0) star.opacity = 0;
+                if (star.opacity > 1) star.opacity = 1;
+            });
+            
+            requestAnimationFrame(animateBgStars);
+        }
+
+        window.addEventListener('resize', resizeBgCanvas);
+        resizeBgCanvas();
+        animateBgStars();
+
+        // ─── Landing Page transition ───
+        document.getElementById('btn-launch-predictor').addEventListener('click', () => {
+            const landing = document.getElementById('landing-page');
+            const dashboard = document.getElementById('dashboard-view');
+            
+            landing.style.opacity = '0';
+            setTimeout(() => {
+                landing.style.display = 'none';
+                dashboard.style.display = 'block';
+                setTimeout(() => {
+                    dashboard.style.opacity = '1';
+                    // Trigger map resize since it initialized hidden
+                    map.invalidateSize();
+                    // Trigger window resize to size Three.js globe correctly
+                    window.dispatchEvent(new Event('resize'));
+                }, 50);
+            }, 800);
+        });
+
+        // ─── Leaflet Map Selector initialization ───
+        const map = L.map('map-leaflet').setView([21.1458, 79.0882], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let marker = L.marker([21.1458, 79.0882]).addTo(map);
+
+        map.on('click', function(e) {
+            const activeRegion = document.querySelector('input[name="region"]:checked').value;
+            if (activeRegion !== 'Custom') return;
+            
+            const lat = e.latlng.lat.toFixed(4);
+            const lon = e.latlng.lng.toFixed(4);
+            
+            document.getElementById('lat').value = lat;
+            document.getElementById('lon').value = lon;
+            marker.setLatLng(e.latlng);
+        });
+
+        document.getElementById('lat').addEventListener('change', updateMarker);
+        document.getElementById('lon').addEventListener('change', updateMarker);
+
+        function updateMarker() {
+            const lat = parseFloat(document.getElementById('lat').value);
+            const lon = parseFloat(document.getElementById('lon').value);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                const newLatLng = new L.LatLng(lat, lon);
+                marker.setLatLng(newLatLng);
+                map.panTo(newLatLng);
+            }
+        }
+
+        // Region Radio Pills Sync
+        const regionRadios = document.querySelectorAll('input[name="region"]');
+        regionRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const val = e.target.value;
+                document.querySelectorAll('.radio-label').forEach(lbl => lbl.classList.remove('active'));
+                e.target.closest('.radio-label').classList.add('active');
+                
+                const latInput = document.getElementById('lat');
+                const lonInput = document.getElementById('lon');
+                
+                if (val === 'Nagpur') {
+                    latInput.value = '21.1458';
+                    lonInput.value = '79.0882';
+                    latInput.disabled = true;
+                    lonInput.disabled = true;
+                    updateMarker();
+                    map.setView([21.1458, 79.0882], 6);
+                } else if (val === 'Globe') {
+                    latInput.value = '0.0000';
+                    lonInput.value = '0.0000';
+                    latInput.disabled = true;
+                    lonInput.disabled = true;
+                    updateMarker();
+                    map.setView([20.0, 0.0], 2);
+                } else {
+                    latInput.disabled = false;
+                    lonInput.disabled = false;
+                    map.setView([latInput.value, lonInput.value], 5);
+                }
+            });
+        });
+
+        // Sync Steps range slider
+        const stepsSlider = document.getElementById('steps');
+        const stepsLabel = document.getElementById('steps-label');
+        stepsSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            stepsLabel.innerText = `${val} Steps (${val * 6}H)`;
+        });
+
+        // ─── PRESSURE_LEVELS from graphcast.py ────────────────────────────────
+        const PRESSURE_LEVELS = {
+            13: [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000],
+            25: [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000],
+            37: [1, 2, 3, 5, 7, 10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        };
+
+        const ATM_VARS = new Set(['temperature','geopotential','u_component_of_wind','v_component_of_wind','vertical_velocity','specific_humidity']);
+
+        function populateLevelSelect(selectEl, nLevels, defaultLvl) {
+            const levels = PRESSURE_LEVELS[nLevels] || PRESSURE_LEVELS[13];
+            selectEl.innerHTML = '';
+            levels.forEach(lvl => {
+                const opt = document.createElement('option');
+                opt.value = lvl;
+                opt.textContent = `${lvl} hPa`;
+                if (lvl === defaultLvl) opt.selected = true;
+                selectEl.appendChild(opt);
+            });
+        }
+
+        // Sync checkpoint → resolution + levels
+        const ckptSelect    = document.getElementById('checkpoint');
+        const resSelect     = document.getElementById('resolution');
+        const lvlSelect     = document.getElementById('levels');
+        const atmLvlGroup   = document.getElementById('atm-level-group');
+        const atmLvlSelect  = document.getElementById('atm-level');
+        const varSelect     = document.getElementById('variable');
+
+        function syncCheckpointMeta() {
+            const opt = ckptSelect.options[ckptSelect.selectedIndex];
+            const res = opt.dataset.res || '1.0';
+            const nLvl = parseInt(opt.dataset.levels || '13');
+
+            // Sync resolution
+            for (let o of resSelect.options) {
+                if (o.value.startsWith(res)) { o.selected = true; break; }
+            }
+            // Sync levels dropdown
+            for (let o of lvlSelect.options) {
+                if (o.value.startsWith(nLvl.toString())) { o.selected = true; break; }
+            }
+            // Repopulate atm-level selector
+            populateLevelSelect(atmLvlSelect, nLvl, 500);
+        }
+        ckptSelect.addEventListener('change', syncCheckpointMeta);
+        syncCheckpointMeta();
+
+        // Show/hide atm-level-group based on variable selection
+        function syncVarAtmLevel() {
+            const isAtm = ATM_VARS.has(varSelect.value);
+            atmLvlGroup.style.display = isAtm ? 'block' : 'none';
+        }
+        varSelect.addEventListener('change', syncVarAtmLevel);
+        syncVarAtmLevel();
+
+        // ─── DATA INSPECTOR LOGIC ─────────────────────────────────────────────
+        const inspVarSel   = document.getElementById('insp-variable');
+        const inspLvlGroup = document.getElementById('insp-level-group');
+        const inspLvlSel   = document.getElementById('insp-level');
+        const inspTimeSel  = document.getElementById('insp-time');
+        const inspBtn      = document.getElementById('inspect-btn');
+        const inspResult   = document.getElementById('inspector-result');
+        const inspLoading  = document.getElementById('inspector-loading');
+        const inspError    = document.getElementById('inspector-error');
+        const inspImg      = document.getElementById('inspector-img');
+        const inspCaption  = document.getElementById('inspector-caption');
+
+        function syncInspectorLevel() {
+            const isAtm = ATM_VARS.has(inspVarSel.value);
+            inspLvlGroup.style.display = isAtm ? 'block' : 'none';
+        }
+        inspVarSel.addEventListener('change', syncInspectorLevel);
+        syncInspectorLevel();
+
+        inspBtn.addEventListener('click', async () => {
+            const variable = inspVarSel.value;
+            const timeIdx  = parseInt(inspTimeSel.value);
+            const isAtm    = ATM_VARS.has(variable);
+            const levelHpa = isAtm ? parseInt(inspLvlSel.value) : null;
+
+            inspResult.style.display  = 'none';
+            inspError.style.display   = 'none';
+            inspLoading.style.display = 'block';
+
+            const lvlParam = levelHpa !== null ? `&level_hpa=${levelHpa}` : '';
+            const url = `/api/inspect_data?variable=${encodeURIComponent(variable)}&time_idx=${timeIdx}${lvlParam}&projection=PlateCarree`;
+
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
+                inspLoading.style.display = 'none';
+
+                if (data.status === 'success') {
+                    inspImg.src = data.plot_url + '?t=' + Date.now();
+                    const lvlStr = data.level_hpa ? ` @ ${data.level_hpa} hPa` : '';
+                    inspCaption.textContent = `Variable: ${data.variable}${lvlStr}  ·  Time step: ${data.time_idx}  ·  Dataset shape: ${data.n_times} time steps`;
+                    inspResult.style.display = 'block';
+                } else {
+                    inspError.textContent = '⚠️ ' + data.message;
+                    inspError.style.display = 'block';
+                }
+            } catch (err) {
+                inspLoading.style.display = 'none';
+                inspError.textContent = '⚠️ API error: ' + err.message;
+                inspError.style.display = 'block';
+            }
+        });
+
+        // ─── 3D GLOBE VISUALIZER LOGIC (Three.js) ───
+        const globeContainer = document.getElementById('globe-canvas-container');
+        let scene, camera, renderer, globeMesh, gnnMesh, gnnNodes, starsParticles;
+        let activeGnnLines = [];
+        let rotationSpeed = 0.0015;
+
+        function init3DGlobe() {
+            const width = globeContainer.clientWidth;
+            const height = globeContainer.clientHeight || 480;
+
+            // Scene & Camera
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.z = 6;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            globeContainer.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0x93c5fd, 0.8);
+            dirLight.position.set(5, 3, 5);
+            scene.add(dirLight);
+
+            // Generate Earth landmass texture map dynamically via 2D Canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw background oceans
+            ctx.fillStyle = '#060b1e';
+            ctx.fillRect(0, 0, 1024, 512);
+            
+            // Draw grid lines on ocean
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i < 1024; i += 32) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+            }
+            for (let j = 0; j < 512; j += 32) {
+                ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(1024, j); ctx.stroke();
+            }
+            
+            // Draw simplified continents
+            ctx.fillStyle = '#0a102c'; 
+            ctx.strokeStyle = '#1d4ed8'; 
+            ctx.lineWidth = 1.5;
+            
+            const scaleX = x => (x + 180) * (1024 / 360);
+            const scaleY = y => (90 - y) * (512 / 180);
+            
+            const drawLand = (coords) => {
+                ctx.beginPath();
+                coords.forEach((p, i) => {
+                    const x = scaleX(p[0]);
+                    const y = scaleY(p[1]);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.closePath();
+                ctx.fill(); ctx.stroke();
+            };
+
+            // Simplified land polygons
+            drawLand([[-20, 35], [-10, 60], [30, 70], [60, 75], [100, 75], [140, 70], [170, 60], [140, 30], [120, 10], [100, 5], [80, 10], [50, 15], [40, 30], [30, 31], [20, 15], [15, 5], [35, -15], [45, -20], [40, -35], [20, -35], [10, -15], [-10, 5], [-15, 15], [-20, 30]]);
+            drawLand([[-15, 15], [15, 30], [30, 30], [32, 15], [50, 10], [45, -20], [35, -34], [20, -34], [10, -10], [-15, 5]]);
+            drawLand([[-160, 65], [-100, 75], [-60, 75], [-50, 60], [-80, 45], [-80, 25], [-90, 15], [-100, 20], [-110, 10], [-120, 35], [-125, 48], [-165, 55]]);
+            drawLand([[-80, 12], [-70, 10], [-50, -5], [-40, -10], [-60, -35], [-70, -55], [-75, -50], [-70, -40], [-80, -20], [-80, -5]]);
+            drawLand([[113, -20], [140, -15], [150, -25], [140, -38], [115, -35]]);
+            ctx.fillRect(0, 465, 1024, 47); // Antarctica
+
+            // Earth Sphere
+            const texture = new THREE.CanvasTexture(canvas);
+            const globeGeo = new THREE.SphereGeometry(2, 64, 64);
+            const globeMat = new THREE.MeshPhongMaterial({
+                map: texture,
+                shininess: 15,
+                bumpScale: 0.05
+            });
+            globeMesh = new THREE.Mesh(globeGeo, globeMat);
+            scene.add(globeMesh);
+
+            // GNN Icosahedral Mesh (Detail level 3 represents GraphCast resolution mapping)
+            const gnnGeo = new THREE.IcosahedronGeometry(2.04, 3);
+            const gnnMat = new THREE.MeshBasicMaterial({
+                color: 0x3b82f6,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.2
+            });
+            gnnMesh = new THREE.Mesh(gnnGeo, gnnMat);
+            scene.add(gnnMesh);
+
+            // GNN Node Vertices
+            const nodesMat = new THREE.PointsMaterial({
+                color: 0x60a5fa,
+                size: 0.045,
+                transparent: true,
+                opacity: 0.7
+            });
+            gnnNodes = new THREE.Points(gnnGeo, nodesMat);
+            scene.add(gnnNodes);
+
+            // Star particles floating around sphere
+            const starsGeo = new THREE.BufferGeometry();
+            const starsCount = 150;
+            const posArray = new Float32Array(starsCount * 3);
+            for (let i = 0; i < starsCount * 3; i += 3) {
+                const u = Math.random();
+                const v = Math.random();
+                const theta = u * 2.0 * Math.PI;
+                const phi = Math.acos(2.0 * v - 1.0);
+                const r = 2.5 + Math.random() * 2.0; // floating radius
+                posArray[i] = r * Math.sin(phi) * Math.cos(theta);
+                posArray[i+1] = r * Math.sin(phi) * Math.sin(theta);
+                posArray[i+2] = r * Math.cos(phi);
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const starPointsMat = new THREE.PointsMaterial({
+                size: 0.02,
+                color: 0x93c5fd,
+                transparent: true,
+                opacity: 0.5
+            });
+            starsParticles = new THREE.Points(starsGeo, starPointsMat);
+            scene.add(starsParticles);
+
+            // Add dynamic GNN message passing links
+            buildGnnPulseLines(gnnGeo);
+
+            // Mouse Drag interaction
+            let isDragging = false;
+            let prevMouseX = 0;
+            let prevMouseY = 0;
+
+            globeContainer.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                prevMouseX = e.clientX;
+                prevMouseY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => { isDragging = false; });
+
+            globeContainer.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const deltaX = e.clientX - prevMouseX;
+                const deltaY = e.clientY - prevMouseY;
+                
+                globeMesh.rotation.y += deltaX * 0.005;
+                gnnMesh.rotation.y += deltaX * 0.005;
+                gnnNodes.rotation.y += deltaX * 0.005;
+                activeGnnLines.forEach(l => l.rotation.y += deltaX * 0.005);
+                
+                globeMesh.rotation.x += deltaY * 0.005;
+                gnnMesh.rotation.x += deltaY * 0.005;
+                gnnNodes.rotation.x += deltaY * 0.005;
+                activeGnnLines.forEach(l => l.rotation.x += deltaY * 0.005);
+                
+                prevMouseX = e.clientX;
+                prevMouseY = e.clientY;
+            });
+
+            // Handle Resize
+            window.addEventListener('resize', () => {
+                const w = globeContainer.clientWidth;
+                const h = globeContainer.clientHeight || 480;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+
+            // Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                if (!isDragging) {
+                    globeMesh.rotation.y += rotationSpeed;
+                    gnnMesh.rotation.y += rotationSpeed;
+                    gnnNodes.rotation.y += rotationSpeed;
+                    activeGnnLines.forEach(l => l.rotation.y += rotationSpeed);
+                    
+                    starsParticles.rotation.y += rotationSpeed * 0.5;
+                }
+                
+                // Animate GNN message pulses opacity
+                activeGnnLines.forEach(line => {
+                    line.material.opacity = 0.15 + 0.45 * Math.sin(Date.now() * 0.003 + line.userData.seed);
+                });
+
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+
+        function buildGnnPulseLines(geom) {
+            // Build lines between random points on icosahedron
+            const pos = geom.attributes.position.array;
+            const vertexCount = pos.length / 3;
+            
+            for (let k = 0; k < 12; k++) {
+                const idxA = Math.floor(Math.random() * vertexCount) * 3;
+                const idxB = Math.floor(Math.random() * vertexCount) * 3;
+                
+                const pA = new THREE.Vector3(pos[idxA], pos[idxA+1], pos[idxA+2]);
+                const pB = new THREE.Vector3(pos[idxB], pos[idxB+1], pos[idxB+2]);
+                
+                // Ensure nodes are not too far apart (draw clean arcs)
+                if (pA.distanceTo(pB) < 1.5 && pA.distanceTo(pB) > 0.4) {
+                    // Create curved arc
+                    const points = [];
+                    for (let j = 0; j <= 8; j++) {
+                        const t = j / 8;
+                        const p = new THREE.Vector3().lerpVectors(pA, pB, t);
+                        p.normalize().multiplyScalar(2.05); // push outward slightly
+                        points.push(p);
+                    }
+                    
+                    const curveGeom = new THREE.BufferGeometry().setFromPoints(points);
+                    const curveMat = new THREE.LineBasicMaterial({
+                        color: 0x60a5fa,
+                        transparent: true,
+                        opacity: 0.4,
+                        linewidth: 1
+                    });
+                    const arcLine = new THREE.Line(curveGeom, curveMat);
+                    arcLine.userData = { seed: Math.random() * 100 };
+                    
+                    scene.add(arcLine);
+                    activeGnnLines.push(arcLine);
+                }
+            }
+        }
+
+        // Initialize 3D Globe on start
+        window.addEventListener('DOMContentLoaded', () => {
+            init3DGlobe();
+        });
+
+        // ─── PIPELINE TRIGGER AND API INTEGRATION ───
+        let currentForecastData = null;
+
+        function updateTimelineStep(idx, data) {
+            if (!data || !data.map_urls || !data.map_urls[idx]) return;
+            
+            // Update contour map image
+            document.getElementById('forecast-map').src = data.map_urls[idx];
+            
+            // Update time slider step title
+            document.getElementById('timeline-step-indicator').innerText = `Step ${idx + 1} — ${data.time_labels[idx]}`;
+            
+            // Highlight active label box
+            const boxes = document.querySelectorAll('.timeline-box');
+            boxes.forEach((box, i) => {
+                if (i === idx) box.classList.add('active');
+                else box.classList.remove('active');
+            });
+        }
+
+        const timelineSlider = document.getElementById('timeline-slider');
+        timelineSlider.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.value);
+            updateTimelineStep(idx, currentForecastData);
+        });
+
+        // Run forecast trigger button click
+        document.getElementById('run-btn').addEventListener('click', async () => {
+            const lat = document.getElementById('lat').value;
+            const lon = document.getElementById('lon').value;
+            const variable = document.getElementById('variable').value;
+            const resolution = document.getElementById('resolution').value;
+            const levels = document.getElementById('levels').value;
+            const checkpoint = document.getElementById('checkpoint').value;
+            const date = document.getElementById('date').value;
+            const stepsVal = document.getElementById('steps').value;
+            const region = document.querySelector('input[name="region"]:checked').value;
+            const projVal = document.getElementById('projection').value;
+
+            // Transition to LOADING state
+            stopPlayback();
+            document.getElementById('idle-text-overlay').style.display = 'none';
+            document.getElementById('status-banner').style.display = 'block';
+            document.getElementById('stepper-overlay').style.display = 'flex';
+            document.getElementById('success-viewport-container').style.display = 'none';
+            document.getElementById('globe-viewport').style.display = 'flex';
+            // Trigger window resize to update Three.js globe canvas size in case display was hidden
+            window.dispatchEvent(new Event('resize'));
+
+            // Boost globe rotation speed to show calculation state
+            rotationSpeed = 0.009;
+            
+            // Reset stepper icons
+            const stepList = [1, 2, 3, 4, 5, 6, 7];
+            stepList.forEach(i => {
+                document.getElementById(`step-${i}`).className = 'step-item';
+            });
+
+            // Call Forecast API
+            const runForecastPromise = (async () => {
+                const url = `/api/forecast?lat=${lat}&lon=${lon}&variable=${variable}&steps=${stepsVal}&resolution=${resolution}&levels=${levels}&checkpoint=${checkpoint}&date=${date}&region=${region}&projection=${projVal}`;
+                const response = await fetch(url);
+                return await response.json();
+            })();
+
+            try {
+                // Stepper animation sequence
+                for (let s = 1; s <= 5; s++) {
+                    document.getElementById(`step-${s}`).className = 'step-item active';
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                    document.getElementById(`step-${s}`).className = 'step-item completed';
+                }
+
+                // Autoregressive prediction rollout step (6)
+                document.getElementById('step-6').className = 'step-item active';
+                
+                // Await prediction calculation from server
+                const data = await runForecastPromise;
+                
+                document.getElementById('step-6').className = 'step-item completed';
+
+                if (data.status === 'success') {
+                    // Final map plotting step (7)
+                    document.getElementById('step-7').className = 'step-item active';
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    document.getElementById('step-7').className = 'step-item completed';
+
+                    // Save data reference
+                    currentForecastData = data;
+
+                    // Standardize variable units
+                    let unit = '°C';
+                    let varLabel = 'T2M';
+                    if (variable === 'total_precipitation_6hr') { unit = ' mm'; varLabel = 'Rainfall'; }
+                    if (variable === 'mean_sea_level_pressure') { unit = ' hPa'; varLabel = 'Pressure'; }
+
+                    // Populate success statistics cards
+                    document.getElementById('stat-peak-title').innerText = `Peak ${varLabel}`;
+                    document.getElementById('stat-peak').innerHTML = `${data.stats.peak_value.toFixed(3)}<span class="stat-unit">${unit}</span>`;
+                    document.getElementById('stat-mean').innerHTML = `${data.stats.mean_value.toFixed(3)}<span class="stat-unit">${unit}</span>`;
+                    document.getElementById('stat-steps').innerHTML = `${data.stats.projected_hours / 6}<span class="stat-unit">× 6h</span>`;
+                    document.getElementById('stat-points').innerHTML = `${data.stats.grid_points}<span class="stat-unit">cells</span>`;
+
+                    // Populate insights table rows
+                    document.getElementById('insight-base-date').innerText = data.stats.base_date;
+                    document.getElementById('insight-region').innerText = data.stats.region_name;
+                    document.getElementById('insight-projected').innerText = `${data.stats.projected_hours} Hours`;
+                    
+                    document.getElementById('insight-max-title').innerText = `Peak ${varLabel} Value`;
+                    document.getElementById('insight-max-val').innerHTML = `${data.stats.peak_value.toFixed(2)}${unit}`;
+                    
+                    document.getElementById('insight-peak-coord').innerText = data.stats.peak_coord_str;
+                    document.getElementById('insight-peak-timing').innerText = data.stats.peak_time_str;
+                    
+                    document.getElementById('insight-avg-title').innerText = `Average ${varLabel}`;
+                    document.getElementById('insight-avg-val').innerHTML = `${data.stats.mean_value.toFixed(2)}${unit}`;
+
+                    // Set download link
+                    document.getElementById('download-link').href = data.dataset_url;
+
+                    // Configure success step slider & dynamic pills labels
+                    const timelineLabelsContainer = document.getElementById('timeline-labels-container');
+                    timelineLabelsContainer.innerHTML = '';
+                    timelineLabelsContainer.style.gridTemplateColumns = `repeat(${data.map_urls.length}, 1fr)`;
+                    
+                    data.map_urls.forEach((url, idx) => {
+                        const cell = document.createElement('div');
+                        cell.className = 'timeline-box' + (idx === 0 ? ' active' : '');
+                        cell.innerText = data.time_labels[idx];
+                        cell.addEventListener('click', () => {
+                            document.getElementById('timeline-slider').value = idx;
+                            updateTimelineStep(idx, data);
+                        });
+                        timelineLabelsContainer.appendChild(cell);
+                    });
+
+                    timelineSlider.min = 0;
+                    timelineSlider.max = data.map_urls.length - 1;
+                    timelineSlider.value = 0;
+
+                    // Set first step
+                    updateTimelineStep(0, data);
+
+                    // Reset Globe state & Hide
+                    rotationSpeed = 0.0015;
+                    document.getElementById('status-banner').style.display = 'none';
+                    document.getElementById('stepper-overlay').style.display = 'none';
+                    document.getElementById('globe-viewport').style.display = 'none';
+                    
+                    // Show success viewport grid
+                    document.getElementById('success-viewport-container').style.display = 'grid';
+                } else {
+                    alert('Forecast run failed: ' + data.message);
+                    resetToIdle();
+                }
+            } catch (err) {
+                alert('API Server Error: ' + err.message);
+                resetToIdle();
+            }
+        });
+
+        function resetToIdle() {
+            stopPlayback();
+            rotationSpeed = 0.0015;
+            document.getElementById('status-banner').style.display = 'none';
+            document.getElementById('stepper-overlay').style.display = 'none';
+            document.getElementById('success-viewport-container').style.display = 'none';
+            document.getElementById('globe-viewport').style.display = 'flex';
+            document.getElementById('idle-text-overlay').style.display = 'block';
+        }
+
+        // Playback Autoplay Logic
+        let playIntervalId = null;
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnFirst = document.getElementById('btn-first');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
+        const btnLast = document.getElementById('btn-last');
+        const chkLoop = document.getElementById('chk-loop');
+        const selSpeed = document.getElementById('sel-speed');
+        const playbackStatusText = document.getElementById('playback-status-text');
+
+        function stopPlayback() {
+            if (playIntervalId) {
+                clearInterval(playIntervalId);
+                playIntervalId = null;
+            }
+            btnPlayPause.innerHTML = '▶ Play';
+            btnPlayPause.classList.remove('active');
+            playbackStatusText.innerText = 'Stopped';
+            playbackStatusText.style.color = 'var(--text-muted)';
+        }
+
+        function startPlayback() {
+            stopPlayback();
+            btnPlayPause.innerHTML = '⏸ Pause';
+            btnPlayPause.classList.add('active');
+            playbackStatusText.innerText = 'Playing';
+            playbackStatusText.style.color = 'var(--success)';
+            
+            const speed = parseInt(selSpeed.value);
+            playIntervalId = setInterval(() => {
+                if (!currentForecastData || !currentForecastData.map_urls) {
+                    stopPlayback();
+                    return;
+                }
+                let currentIdx = parseInt(timelineSlider.value);
+                let nextIdx = currentIdx + 1;
+                if (nextIdx >= currentForecastData.map_urls.length) {
+                    if (chkLoop.checked) {
+                        nextIdx = 0;
+                    } else {
+                        stopPlayback();
+                        return;
+                    }
+                }
+                timelineSlider.value = nextIdx;
+                updateTimelineStep(nextIdx, currentForecastData);
+            }, speed);
+        }
+
+        btnPlayPause.addEventListener('click', () => {
+            if (playIntervalId) {
+                stopPlayback();
+            } else {
+                startPlayback();
+            }
+        });
+
+        btnFirst.addEventListener('click', () => {
+            stopPlayback();
+            if (currentForecastData) {
+                timelineSlider.value = 0;
+                updateTimelineStep(0, currentForecastData);
+            }
+        });
+
+        btnLast.addEventListener('click', () => {
+            stopPlayback();
+            if (currentForecastData) {
+                const lastIdx = currentForecastData.map_urls.length - 1;
+                timelineSlider.value = lastIdx;
+                updateTimelineStep(lastIdx, currentForecastData);
+            }
+        });
+
+        btnPrev.addEventListener('click', () => {
+            stopPlayback();
+            if (currentForecastData) {
+                let prevIdx = parseInt(timelineSlider.value) - 1;
+                if (prevIdx < 0) prevIdx = currentForecastData.map_urls.length - 1;
+                timelineSlider.value = prevIdx;
+                updateTimelineStep(prevIdx, currentForecastData);
+            }
+        });
+
+        btnNext.addEventListener('click', () => {
+            stopPlayback();
+            if (currentForecastData) {
+                let nextIdx = parseInt(timelineSlider.value) + 1;
+                if (nextIdx >= currentForecastData.map_urls.length) nextIdx = 0;
+                timelineSlider.value = nextIdx;
+                updateTimelineStep(nextIdx, currentForecastData);
+            }
+        });
+
+        selSpeed.addEventListener('change', () => {
+            if (playIntervalId) {
+                startPlayback();
+            }
+        });
+
+        // Pause playing if slider is manipulated manually
+        timelineSlider.addEventListener('mousedown', () => {
+            stopPlayback();
+        });
+        timelineSlider.addEventListener('touchstart', () => {
+            stopPlayback();
+        });
+
+        // Default initialize settings
+        window.addEventListener('DOMContentLoaded', () => {
+            const nagpurRadio = document.querySelector('input[name="region"][value="Nagpur"]');
+            if (nagpurRadio) {
+                nagpurRadio.checked = true;
+                nagpurRadio.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>
