@@ -1,10 +1,12 @@
 # app.py
 import sys
 import os
+import threading
+import shutil
 # Add parent directory to path so that production_pipeline package is importable when run directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
@@ -21,6 +23,7 @@ from production_pipeline import normalization
 from production_pipeline import inference
 from production_pipeline import training
 from production_pipeline import visualization
+from production_pipeline import progressive_upgrade
 from production_pipeline.utils import logger
 import jax
 import dataclasses
@@ -183,11 +186,17 @@ async def run_forecast_api(
     
     try:
         # Check if actual pre-trained snapshots are present
-        ckpt_path = "checkpoints/fine_tuned_model.nc"
+        if checkpoint in ["GraphCast_small", "fine_tuned_model"]:
+            ckpt_path = "checkpoints/fine_tuned_model.nc"
+        else:
+            chk_name = checkpoint if checkpoint.endswith(".nc") else f"{checkpoint}.nc"
+            ckpt_path = os.path.join("checkpoints", chk_name)
+            if not os.path.exists(ckpt_path):
+                ckpt_path = "checkpoints/fine_tuned_model.nc"
         
         # Determine whether to execute real model or compile a physically consistent forecast simulator
         if os.path.exists(ckpt_path):
-            logger.info("Operational checkpoint detected. Preparing JAX model for regional forecast inference...")
+            logger.info(f"Operational checkpoint detected: {ckpt_path}. Preparing JAX model for regional forecast inference...")
             # 1. Load pre-trained parameters and config
             ckpt = training.load_pretrained_checkpoint(ckpt_path)
             parameter_leaves = jax.tree_util.tree_leaves(ckpt.params)
@@ -526,6 +535,222 @@ async def inspect_data_api(
         logger.error(f"Data inspector failed: {e}")
         import traceback; traceback.print_exc()
         return {"status": "error", "message": str(e)}
+
+
+# Global state for progressive yearly upgrade task
+upgrade_task = {
+    "status": "idle",  # "idle", "running", "completed", "error"
+    "current_year": None,
+    "current_epoch": 0,
+    "state_message": "Ready",
+    "loss": 0.0,
+    "start_year": None,
+    "end_year": None,
+    "epochs_per_year": 1,
+    "use_simulation": True,
+    "logs": [],
+    "loss_history": [],  # list of {"year": Y, "epoch": E, "loss": L}
+    "error_message": "",
+    "should_stop": False,
+    "thread": None
+}
+
+@app.post("/api/upgrade/start")
+async def start_upgrade(
+    start_year: int = Query(2015, description="Start year"),
+    end_year: int = Query(2017, description="End year"),
+    epochs_per_year: int = Query(1, description="Epochs per year"),
+    use_simulation: bool = Query(True, description="Use simulation mode")
+):
+    if upgrade_task["status"] == "running":
+        raise HTTPException(status_code=400, detail="Upgrade task is already running.")
+
+    # Reset task state
+    upgrade_task["status"] = "running"
+    upgrade_task["current_year"] = None
+    upgrade_task["current_epoch"] = 0
+    upgrade_task["state_message"] = "Initializing progressive upgrade..."
+    upgrade_task["loss"] = 0.0
+    upgrade_task["start_year"] = start_year
+    upgrade_task["end_year"] = end_year
+    upgrade_task["epochs_per_year"] = epochs_per_year
+    upgrade_task["use_simulation"] = use_simulation
+    upgrade_task["logs"] = []
+    upgrade_task["loss_history"] = []
+    upgrade_task["error_message"] = ""
+    upgrade_task["should_stop"] = False
+
+    def log_cb(msg):
+        upgrade_task["logs"].append(msg)
+        if len(upgrade_task["logs"]) > 1000:
+            upgrade_task["logs"].pop(0)
+
+    def progress_cb(year, epoch, state, loss):
+        upgrade_task["current_year"] = year
+        upgrade_task["current_epoch"] = epoch
+        upgrade_task["state_message"] = state
+        if loss > 0:
+            upgrade_task["loss"] = loss
+            upgrade_task["loss_history"].append({
+                "year": year,
+                "epoch": epoch,
+                "loss": loss
+            })
+
+    def stop_check():
+        return upgrade_task["should_stop"]
+
+    def worker():
+        try:
+            progressive_upgrade.run_progressive_upgrade_flow(
+                start_year=start_year,
+                end_year=end_year,
+                epochs_per_year=epochs_per_year,
+                use_simulation=use_simulation,
+                log_callback=log_cb,
+                progress_callback=progress_cb,
+                stop_check=stop_check
+            )
+            if upgrade_task["should_stop"]:
+                upgrade_task["status"] = "idle"
+                upgrade_task["state_message"] = "Cancelled"
+                upgrade_task["logs"].append("[INFO] Training cancelled by user.")
+            else:
+                upgrade_task["status"] = "completed"
+                upgrade_task["state_message"] = "Upgrades Completed"
+                upgrade_task["logs"].append("[SUCCESS] All upgrades finished successfully!")
+        except Exception as e:
+            import traceback
+            err_trace = traceback.format_exc()
+            logger.error(f"Upgrade flow exception: {err_trace}")
+            upgrade_task["status"] = "error"
+            upgrade_task["error_message"] = str(e)
+            upgrade_task["state_message"] = "Failed"
+            upgrade_task["logs"].append(f"[ERROR] Task failed: {str(e)}")
+
+    upgrade_task["thread"] = threading.Thread(target=worker, daemon=True)
+    upgrade_task["thread"].start()
+    return {"status": "success", "message": "Yearly upgrade task started in the background."}
+
+@app.post("/api/upgrade/stop")
+async def stop_upgrade():
+    if upgrade_task["status"] != "running":
+        return {"status": "success", "message": "Task is not running."}
+    upgrade_task["should_stop"] = True
+    upgrade_task["state_message"] = "Stopping..."
+    upgrade_task["logs"].append("[INFO] Cancellation request received. Stopping at next year boundary...")
+    return {"status": "success", "message": "Cancellation request submitted."}
+
+@app.get("/api/upgrade/status")
+async def get_upgrade_status():
+    return {
+        "status": upgrade_task["status"],
+        "current_year": upgrade_task["current_year"],
+        "current_epoch": upgrade_task["current_epoch"],
+        "state_message": upgrade_task["state_message"],
+        "loss": upgrade_task["loss"],
+        "start_year": upgrade_task["start_year"],
+        "end_year": upgrade_task["end_year"],
+        "epochs_per_year": upgrade_task["epochs_per_year"],
+        "use_simulation": upgrade_task["use_simulation"],
+        "logs": upgrade_task["logs"],
+        "loss_history": upgrade_task["loss_history"],
+        "error_message": upgrade_task["error_message"]
+    }
+
+@app.get("/api/checkpoints")
+async def list_checkpoints():
+    checkpoints_dir = "checkpoints"
+    if not os.path.exists(checkpoints_dir):
+        return []
+    
+    files = sorted(os.listdir(checkpoints_dir))
+    results = []
+    
+    ignore_files = [
+        "diffs_stddev_by_level.nc",
+        "mean_by_level.nc",
+        "stddev_by_level.nc",
+        "source-era5_date-2022-01-01_res-1.0_levels-13_steps-04.nc"
+    ]
+    
+    for filename in files:
+        if filename in ignore_files or not filename.endswith(".nc"):
+            continue
+            
+        file_path = os.path.join(checkpoints_dir, filename)
+        try:
+            stat_info = os.stat(file_path)
+            size_mb = stat_info.st_size / (1024 * 1024)
+            mod_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(stat_info.st_mtime))
+            
+            # Load metadata
+            ckpt = training.load_pretrained_checkpoint(file_path)
+            param_leaves = jax.tree_util.tree_leaves(ckpt.params)
+            param_count = sum(p.size for p in param_leaves)
+            description = ckpt.description
+            
+            # Check if this model is active
+            is_active = False
+            if filename == "fine_tuned_model.nc":
+                is_active = True
+            else:
+                active_path = os.path.join(checkpoints_dir, "fine_tuned_model.nc")
+                if os.path.exists(active_path):
+                    active_stat = os.stat(active_path)
+                    if abs(active_stat.st_size - stat_info.st_size) < 1024:
+                        is_active = True
+            
+            results.append({
+                "name": filename,
+                "size_mb": round(size_mb, 2),
+                "modified": mod_time,
+                "param_count": param_count,
+                "description": description,
+                "is_active": is_active
+            })
+        except Exception as e:
+            logger.debug(f"Skipping checkpoint load for {filename}: {e}")
+            
+    return results
+
+@app.post("/api/checkpoints/activate")
+async def activate_checkpoint(name: str = Query(..., description="Checkpoint filename")):
+    src_path = os.path.join("checkpoints", name)
+    dst_path = os.path.join("checkpoints", "fine_tuned_model.nc")
+    
+    if not os.path.exists(src_path):
+        raise HTTPException(status_code=404, detail=f"Checkpoint {name} not found.")
+        
+    try:
+        shutil.copy2(src_path, dst_path)
+        logger.info(f"Checkpoint promoted to active: {name}")
+        return {"status": "success", "message": f"Checkpoint {name} promoted to active operational model."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/checkpoints/{name}")
+async def delete_checkpoint(name: str):
+    if name == "fine_tuned_model.nc":
+        raise HTTPException(status_code=400, detail="Cannot delete the active operational checkpoint.")
+        
+    file_path = os.path.join("checkpoints", name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Checkpoint not found.")
+        
+    try:
+        os.remove(file_path)
+        logger.info(f"Checkpoint deleted: {name}")
+        return {"status": "success", "message": f"Checkpoint {name} deleted."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/checkpoints/download/{name}")
+async def download_checkpoint_file(name: str):
+    file_path = os.path.join("checkpoints", name)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Checkpoint file not found.")
+    return FileResponse(file_path, media_type="application/octet-stream", filename=name)
 
 
 @app.get("/static/outputs/{filename}")

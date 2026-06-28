@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GraphCast · Rainfall Prediction</title>
+  <meta name="description" content="AI-powered rainfall forecasting using Google DeepMind GraphCast — visualize ERA5-based 6-hour precipitation predictions for any region." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Cosmic Background -->
+  <div class="cosmos-bg">
+    <canvas id="starsCanvas"></canvas>
+    <div class="nebula nebula-1"></div>
+    <div class="nebula nebula-2"></div>
+    <div class="nebula nebula-3"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="18" cy="18" r="16" stroke="url(#lg1)" stroke-width="2"/>
+            <path d="M10 22 Q14 12 18 18 Q22 24 26 14" stroke="url(#lg2)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <circle cx="18" cy="18" r="3" fill="url(#lg1)"/>
+            <defs>
+              <linearGradient id="lg1" x1="2" y1="2" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#60a5fa"/><stop offset="1" stop-color="#a78bfa"/>
+              </linearGradient>
+              <linearGradient id="lg2" x1="10" y1="10" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#34d399"/><stop offset="1" stop-color="#60a5fa"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-title">GraphCast</div>
+          <div class="logo-sub">Rainfall Prediction</div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tab-navigation">
+        <button class="nav-tab active" id="tab-btn-forecast" onclick="switchTab('forecast-tab')">🌧️ Forecast</button>
+        <button class="nav-tab" id="tab-btn-upgrade" onclick="switchTab('upgrade-tab')">🔄 Model Upgrader</button>
+      </div>
+
+      <div class="header-badge">AI · ERA5 · DeepMind</div>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- FORECAST TAB                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <main class="tab-content active" id="forecast-tab" style="max-width:1400px; margin:0 auto; padding:1.5rem 1.5rem 3rem; position:relative; z-index:1;">
+
+    <!-- ── Controls Panel ──────────────────────────────────────────── -->
+    <aside class="controls-panel glass">
+      <div class="panel-heading">
+        <span class="panel-icon">⚙️</span>
+        <span>Forecast Settings</span>
+      </div>
+
+      <!-- Resolution -->
+      <div class="form-group">
+        <label class="form-label" for="resolution">Grid Resolution</label>
+        <div class="select-wrap">
+          <select id="resolution" class="form-select">
+            <option value="1.0">1.0° (~111 km)</option>
+            <option value="0.25">0.25° (~28 km)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Pressure Levels -->
+      <div class="form-group">
+        <label class="form-label" for="pressureLevels">Pressure Levels</label>
+        <div class="select-wrap">
+          <select id="pressureLevels" class="form-select">
+            <option value="13">13 levels</option>
+            <option value="37">37 levels (full atmosphere)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Checkpoint -->
+      <div class="form-group">
+        <label class="form-label" for="checkpoint">Model Checkpoint</label>
+        <div class="select-wrap">
+          <select id="checkpoint" class="form-select">
+            <option value="">Loading checkpoints…</option>
+          </select>
+        </div>
+        <div class="form-hint" id="checkpointHint"></div>
+      </div>
+
+      <!-- Forecast Date -->
+      <div class="form-group">
+        <label class="form-label" for="forecastDate">Forecast Start Date</label>
+        <input type="date" id="forecastDate" class="form-input" />
+        <div class="form-hint">ERA5 data available ~5 days behind present</div>
+      </div>
+
+      <!-- Forecast Steps -->
+      <div class="form-group">
+        <label class="form-label" for="forecastSteps">
+          Forecast Steps — <span id="stepsLabel" class="accent-text">4 steps (24h)</span>
+        </label>
+        <input type="range" id="forecastSteps" class="form-slider"
+               min="1" max="10" value="4" step="1" />
+        <div class="slider-ticks">
+          <span>6h</span><span>24h</span><span>48h</span><span>60h</span>
+        </div>
+      </div>
+
+      <!-- Region -->
+      <div class="form-group">
+        <label class="form-label">Region</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="region" id="regionNagpur" value="nagpur" checked />
+            <span class="radio-pill">📍 Nagpur</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="region" id="regionCustom" value="custom" />
+            <span class="radio-pill">🗺️ Custom</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="region" id="regionGlobal" value="global" />
+            <span class="radio-pill">🌍 Globe</span>
+          </label>
+        </div>
+
+        <!-- Leaflet Map Selector -->
+        <div id="region-map-container"></div>
+
+        <div id="customBounds" class="custom-bounds hidden">
+          <div class="bounds-grid">
+            <div class="form-group-sm">
+              <label class="form-label-sm">Lat Min</label>
+              <input type="number" id="latMin" class="form-input-sm" value="20.0" step="0.5" />
+            </div>
+            <div class="form-group-sm">
+              <label class="form-label-sm">Lat Max</label>
+              <input type="number" id="latMax" class="form-input-sm" value="22.0" step="0.5" />
+            </div>
+            <div class="form-group-sm">
+              <label class="form-label-sm">Lon Min</label>
+              <input type="number" id="lonMin" class="form-input-sm" value="78.0" step="0.5" />
+            </div>
+            <div class="form-group-sm">
+              <label class="form-label-sm">Lon Max</label>
+              <input type="number" id="lonMax" class="form-input-sm" value="80.0" step="0.5" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run Button -->
+      <button id="runBtn" class="run-btn" onclick="startForecast()">
+        <span class="run-btn-icon">🚀</span>
+        <span class="run-btn-text">Run GraphCast</span>
+      </button>
+
+      <div class="model-credit">
+        Powered by
+        <a href="https://github.com/google-deepmind/graphcast" target="_blank" rel="noopener">
+          Google DeepMind GraphCast
+        </a>
+      </div>
+    </aside>
+
+    <!-- ── Output Panel ────────────────────────────────────────────── -->
+    <section class="output-panel">
+
+      <!-- Status Bar -->
+      <div id="statusBar" class="status-bar glass hidden">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Initializing…</span>
+        <div class="spinner" id="statusSpinner"></div>
+      </div>
+
+      <!-- Idle State -->
+      <div id="idleState" class="idle-state">
+        <div class="idle-graphic">
+          <svg class="idle-globe" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="60" r="50" stroke="rgba(96,165,250,0.25)" stroke-width="2"/>
+            <circle cx="60" cy="60" r="35" stroke="rgba(167,139,250,0.2)" stroke-width="1.5" stroke-dasharray="6 4"/>
+            <circle cx="60" cy="60" r="20" stroke="rgba(52,211,153,0.2)" stroke-width="1" stroke-dasharray="4 3"/>
+            <circle cx="60" cy="60" r="6" fill="rgba(96,165,250,0.6)"/>
+            <line x1="10" y1="60" x2="110" y2="60" stroke="rgba(96,165,250,0.15)" stroke-width="1"/>
+            <line x1="60" y1="10" x2="60" y2="110" stroke="rgba(96,165,250,0.15)" stroke-width="1"/>
+            <g fill="rgba(52,211,153,0.5)">
+              <ellipse cx="42" cy="38" rx="3" ry="5"/>
+              <ellipse cx="63" cy="45" rx="2.5" ry="4"/>
+              <ellipse cx="80" cy="34" rx="2" ry="3.5"/>
+              <ellipse cx="55" cy="75" rx="3" ry="5"/>
+              <ellipse cx="78" cy="70" rx="2" ry="3.5"/>
+              <ellipse cx="35" cy="68" rx="2.5" ry="4"/>
+            </g>
+          </svg>
+        </div>
+        <h2 class="idle-title">Ready to Forecast</h2>
+        <p class="idle-body">Configure your parameters and press <strong>Run GraphCast</strong>.<br/>
+        Each step represents a 6-hour precipitation prediction.</p>
+        <div class="idle-chips">
+          <span class="chip">ERA5 Reanalysis</span>
+          <span class="chip">JAX + Haiku</span>
+          <span class="chip">Autoregressive Rollout</span>
+        </div>
+      </div>
+
+      <!-- Results State -->
+      <div id="resultsState" class="results-state hidden">
+        <div class="viz-card glass">
+          <div class="viz-header">
+            <div class="viz-title">
+              <span class="viz-icon">🌧️</span>
+              Precipitation Forecast
+              <span id="vizRegionLabel" class="region-pill">Nagpur Region</span>
+            </div>
+            <div class="viz-controls">
+              <button class="time-btn" id="playPauseBtn" onclick="togglePlayback()">⏸ Pause</button>
+              <button class="time-btn" onclick="downloadNetCDF()">⬇ Download NetCDF</button>
+            </div>
+          </div>
+
+          <div class="map-container">
+            <canvas id="mapCanvas"></canvas>
+            <div class="map-colorbar">
+              <div class="colorbar-gradient"></div>
+              <div class="colorbar-labels">
+                <span id="cbMax">20 mm</span>
+                <span id="cbMid">10 mm</span>
+                <span id="cbMin">0 mm</span>
+              </div>
+            </div>
+            <div class="map-axes">
+              <div id="latLabels" class="lat-labels"></div>
+              <div id="lonLabels" class="lon-labels"></div>
+            </div>
+            <div class="map-overlay-tip">Click map to see value</div>
+          </div>
+
+          <div id="mapTooltip" class="map-tooltip hidden"></div>
+
+          <div class="time-scrubber">
+            <div class="time-steps" id="timeSteps"></div>
+            <input type="range" id="timeSlider" class="time-slider" min="0" value="0" step="1"/>
+          </div>
+          <div class="current-time-label" id="currentTimeLabel">Step 1 — +6h</div>
+        </div>
+
+        <div class="stats-row" id="statsRow"></div>
+
+        <div class="insights-panel hidden" id="insightsPanel">
+          <div class="viz-header">
+            <h2 class="viz-title">
+              <span class="viz-icon">💡</span> Forecast Insights & Analysis
+            </h2>
+          </div>
+          <div class="insights-content" id="insightsContent"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- MODEL UPGRADER TAB                                            -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <main class="tab-content" id="upgrade-tab" style="max-width:1400px; margin:0 auto; padding:1.5rem 1.5rem 3rem; position:relative; z-index:1;">
+
+    <!-- ── Upgrader Settings Panel ─────────────────────────────────── -->
+    <aside class="controls-panel glass">
+      <div class="panel-heading">
+        <span class="panel-icon">🔄</span>
+        <span>Upgrade Settings</span>
+      </div>
+
+      <!-- Start Year -->
+      <div class="form-group">
+        <label class="form-label" for="startYear">Start Year</label>
+        <div class="select-wrap">
+          <select id="startYear" class="form-select">
+            <option value="2015">2015</option>
+            <option value="2016">2016</option>
+            <option value="2017">2017</option>
+            <option value="2018" selected>2018</option>
+            <option value="2019">2019</option>
+            <option value="2020">2020</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- End Year -->
+      <div class="form-group">
+        <label class="form-label" for="endYear">End Year</label>
+        <div class="select-wrap">
+          <select id="endYear" class="form-select">
+            <option value="2019">2019</option>
+            <option value="2020">2020</option>
+            <option value="2021">2021</option>
+            <option value="2022" selected>2022</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Epochs Per Year -->
+      <div class="form-group">
+        <label class="form-label" for="epochsPerYear">
+          Epochs Per Year — <span id="epochLabel" class="accent-text">3 epochs</span>
+        </label>
+        <input type="range" id="epochsPerYear" class="form-slider"
+               min="1" max="10" value="3" step="1" />
+        <div class="slider-ticks">
+          <span>1</span><span>5</span><span>10</span>
+        </div>
+      </div>
+
+      <!-- Learning Rate -->
+      <div class="form-group">
+        <label class="form-label" for="learningRate">Learning Rate</label>
+        <div class="select-wrap">
+          <select id="learningRate" class="form-select">
+            <option value="0.001">1e-3 (Fast)</option>
+            <option value="0.0003" selected>3e-4 (Default)</option>
+            <option value="0.0001">1e-4 (Conservative)</option>
+            <option value="0.00003">3e-5 (Fine-tune)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Use Simulated Data toggle -->
+      <div class="form-group">
+        <label class="form-label">Data Source</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="dataSource" id="dataSimulated" value="simulated" checked />
+            <span class="radio-pill">🧪 Simulated</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="dataSource" id="dataCDS" value="cds" />
+            <span class="radio-pill">🌐 CDS Real</span>
+          </label>
+        </div>
+        <div class="form-hint">Simulated data for testing; CDS for real ERA5 training</div>
+      </div>
+
+      <!-- Start Training Button -->
+      <button id="upgradeBtn" class="run-btn" onclick="startUpgrade()">
+        <span class="run-btn-icon">⚡</span>
+        <span class="run-btn-text">Start Progressive Training</span>
+      </button>
+
+      <!-- Current Status -->
+      <div style="text-align:center; margin-top:4px;">
+        <span class="upgrade-status-pill idle" id="upgradeStatusPill">● Idle</span>
+      </div>
+    </aside>
+
+    <!-- ── Upgrader Output Panel ───────────────────────────────────── -->
+    <section class="output-panel">
+
+      <!-- Year Timeline Progress -->
+      <div class="timeline-container" id="timelineContainer">
+        <!-- Populated dynamically -->
+        <div class="timeline-node">
+          <div class="timeline-dot pending">—</div>
+          <span class="timeline-year">Configure years and press Start</span>
+        </div>
+      </div>
+
+      <!-- Learning Loss Chart -->
+      <div class="loss-chart-container">
+        <div class="loss-chart-header">
+          <div class="loss-chart-title">
+            <span class="icon">📉</span> Learning Loss Curve
+          </div>
+          <span class="upgrade-status-pill idle" id="lossChartStatus">No data</span>
+        </div>
+        <canvas id="lossCanvas"></canvas>
+      </div>
+
+      <!-- Log Console -->
+      <div class="log-console" id="upgradeLog">
+        <div class="log-line"><span class="log-time">[--:--]</span><span class="log-msg">Waiting for training to start…</span></div>
+      </div>
+
+      <!-- Checkpoint Manager Table -->
+      <div class="ckpt-table-container">
+        <div class="ckpt-table-header">
+          <div class="ckpt-table-title">💾 Saved Checkpoints</div>
+        </div>
+        <table class="ckpt-table">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>File</th>
+              <th>Size</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ckptTableBody">
+            <tr>
+              <td colspan="5" style="text-align:center; color:var(--text-muted); padding:24px;">
+                No checkpoints yet. Run progressive training to generate models.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

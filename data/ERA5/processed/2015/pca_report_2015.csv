@@ -1,0 +1,15 @@
+variable,original_shape,n_components,variance_explained_pct,compression_ratio,original_size_mb,compressed_size_mb
+temperature,"(1460, 19305)",100,98.6,193.1,107.52,0.56
+specific_humidity,"(1460, 19305)",100,97.75,193.1,107.52,0.56
+u_component_of_wind,"(1460, 19305)",69,99.01,279.8,107.52,0.38
+v_component_of_wind,"(1460, 19305)",100,97.19,193.1,107.52,0.56
+geopotential,"(1460, 19305)",8,99.13,2413.1,107.52,0.04
+vertical_velocity,"(1460, 19305)",100,56.36,193.1,107.52,0.56
+total_precipitation_6hr,"(1460, 1485)",100,87.9,14.8,8.27,0.56
+2m_temperature,"(1460, 1485)",30,99.02,49.5,8.27,0.17
+10m_u_component_of_wind,"(1460, 1485)",100,98.32,14.8,8.27,0.56
+10m_v_component_of_wind,"(1460, 1485)",100,97.14,14.8,8.27,0.56
+mean_sea_level_pressure,"(1460, 1485)",3,99.08,495.0,8.27,0.02
+total_cloud_cover,"(1460, 1485)",100,97.35,14.8,8.27,0.56
+surface_pressure,"(1460, 1485)",3,99.15,495.0,8.27,0.02
+land_sea_mask,"(1460, 1485)",1,inf,1485.0,8.27,0.01

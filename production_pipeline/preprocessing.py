@@ -24,6 +24,8 @@ def align_coordinates(ds: xr.Dataset) -> xr.Dataset:
         rename_dict["longitude"] = "lon"
     if "pressure_level" in ds.coords and "level" not in ds.dims:
         rename_dict["pressure_level"] = "level"
+    if "valid_time" in ds.coords and "time" not in ds.dims:
+        rename_dict["valid_time"] = "time"
         
     if rename_dict:
         logger.info(f"Renaming coordinates: {rename_dict}")

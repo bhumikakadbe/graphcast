@@ -240,7 +240,8 @@ class ERA5PCACompressor:
             n_keep = meta["n_components_kept"]
             spatial_shape = meta["spatial_shape"]
 
-            compressed_matrix = compressed_ds[var].values  # (time, n_keep)
+            # Slice to actual components kept (xarray aligns and pads other elements with NaN)
+            compressed_matrix = compressed_ds[var].values[:, :n_keep]  # (time, n_keep)
 
             # Pad with zeros for components we dropped
             n_comps_total = pca.n_components_

@@ -1,7 +1,7 @@
 # training.py
 import functools
 import os
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional, Callable
 import jax
 import jax.numpy as jnp
 import haiku as hk
@@ -161,7 +161,9 @@ def run_fine_tuning_loop(
     model_config: graphcast.ModelConfig,
     task_config: graphcast.TaskConfig,
     epochs: int = 5,
-    checkpoint_out_path: str = "checkpoints/fine_tuned_model.nc"
+    checkpoint_out_path: str = "checkpoints/fine_tuned_model.nc",
+    checkpoint_in_path: Optional[str] = None,
+    on_epoch_end: Optional[Callable[[int, float], None]] = None
 ) -> dict:
     """Executes a model fine-tuning loop, compiling and applying updates via JAX.
     
@@ -213,6 +215,16 @@ def run_fine_tuning_loop(
         forcings=forcings_np
     )
     
+    # Resume from existing checkpoint if provided
+    if checkpoint_in_path and os.path.exists(checkpoint_in_path):
+        logger.info(f"Loading checkpoint parameters from: {checkpoint_in_path}")
+        try:
+            ckpt = load_pretrained_checkpoint(checkpoint_in_path)
+            params = ckpt.params
+            logger.info("Successfully loaded parameters from previous checkpoint.")
+        except Exception as e:
+            logger.error(f"Failed to load checkpoint from {checkpoint_in_path}: {e}. Initializing randomly.")
+            
     opt_state = opt.init(params)
     logger.info(f"Model successfully initialized. Parameter leaves: {len(jax.tree_util.tree_leaves(params))}")
     
@@ -225,8 +237,15 @@ def run_fine_tuning_loop(
             params, opt_state, state, inputs_np, targets_np, forcings_np
         )
         
-        logger.info(f"Epoch {epoch+1} Loss: {float(loss_val):.6f}")
+        loss_float = float(loss_val)
+        logger.info(f"Epoch {epoch+1} Loss: {loss_float:.6f}")
         log_system_resources(f"Epoch {epoch+1} Resource Check")
+        
+        if on_epoch_end:
+            try:
+                on_epoch_end(epoch + 1, loss_float)
+            except Exception as e:
+                logger.warning(f"Error in on_epoch_end callback: {e}")
         
     # Save the updated checkpoints
     save_checkpoint(
