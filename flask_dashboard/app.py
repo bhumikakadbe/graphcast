@@ -258,7 +258,7 @@ def api_download(job_id: str):
 # Model Upgrader — Progressive Year-by-Year Training
 # ═══════════════════════════════════════════════════════════════════════════════
 
-CHECKPOINT_DIR = os.path.join(os.path.dirname(__file__), "checkpoints")
+CHECKPOINT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "checkpoints")
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
 # Upgrade state (in-memory, single-user)

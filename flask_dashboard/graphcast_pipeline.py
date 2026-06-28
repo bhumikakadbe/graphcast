@@ -459,7 +459,7 @@ def load_normalization_stats(tmpdir: str) -> tuple[xr.Dataset, xr.Dataset, xr.Da
 
 def load_checkpoint(checkpoint_name: str, tmpdir: str):
     """Load checkpoint from local folder or GCS and return (params, state, model_config, task_config)."""
-    local_path = os.path.join(os.path.dirname(__file__), "checkpoints", checkpoint_name)
+    local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "checkpoints", checkpoint_name)
     dest   = os.path.join(tmpdir, checkpoint_name)
 
     if os.path.exists(local_path):
